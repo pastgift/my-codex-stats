@@ -32,36 +32,49 @@
     },
     "commands": [
       {
-        "command": "codex-usage.refresh",
+        "command": "my-codex-stats.refresh",
         "title": "Refresh My Codex Stats"
       },
       {
-        "command": "codex-usage.login",
+        "command": "my-codex-stats.login",
         "title": "Login to Codex"
       }
     ],
     "configuration": {
       "title": "My Codex Stats",
       "properties": {
-        "codexUsage.updateInterval": {
+        "myCodexStats.updateInterval": {
           "type": "number",
           "default": 300,
-          "description": "Update interval in seconds (default: 300 = 5 minutes)"
+          "description": "自动刷新间隔，单位为秒（默认 300，即 5 分钟）。"
         },
-        "codexUsage.showNotifications": {
-          "type": "boolean",
-          "default": false,
-          "description": "Show notifications when rate limits are high"
+        "myCodexStats.balanceDisplayMode": {
+          "type": "string",
+          "default": "Remaining",
+          "enum": [
+            "Used",
+            "Remaining"
+          ],
+          "enumDescriptions": [
+            "显示已使用额度百分比。",
+            "显示剩余额度百分比。"
+          ],
+          "description": "控制状态栏百分比显示已使用额度还是剩余额度。"
         },
-        "codexUsage.proxyUrl": {
+        "myCodexStats.statusBarTemplate": {
+          "type": "string",
+          "default": "{5h.bar} {5h} · {5h.left} / {week.bar} {week} · {week.next}",
+          "description": "状态栏展示模板。图标会自动显示在模板前方，并与模板之间保留 1 个空格。支持占位符：{account}、{5h}、{week}、{5h.bar}、{week.bar}、{5h.next}、{5h.left}、{week.next}、{week.left}。"
+        },
+        "myCodexStats.proxyUrl": {
           "type": "string",
           "default": "",
-          "description": "Proxy URL for Codex API requests, for example http://127.0.0.1:7890. Leave empty to connect directly."
+          "description": "Codex API 请求代理地址，例如 http://127.0.0.1:7890。留空则直接连接。"
         },
-        "codexUsage.model": {
+        "myCodexStats.model": {
           "type": "string",
           "default": "gpt-5.4-mini",
-          "description": "Model slug used for minimal Codex API requests. Use a model supported by your ChatGPT Codex account."
+          "description": "用于最小化 Codex API 请求的模型名称。请使用当前 ChatGPT Codex 账号支持的模型。"
         }
       }
     }
@@ -82,10 +95,11 @@
     "@typescript-eslint/eslint-plugin": "^5.45.0",
     "@typescript-eslint/parser": "^5.45.0",
     "eslint": "^8.28.0",
-    "typescript": "^4.9.3"
+    "typescript": "^4.9.3",
+    "vsce": "^2.15.0"
   },
   "dependencies": {
-    "axios": "^1.6.0",
-    "vsce": "^2.15.0"
+    "axios": "^1.17.0",
+    "https-proxy-agent": "^7.0.6"
   }
 }

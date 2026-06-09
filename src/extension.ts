@@ -6,10 +6,16 @@ import {
   showAuthError,
   getStatusBarItem,
 } from './ui/status-bar'
-import { initializeMonitor, updateUsage } from './services/usage-monitor'
+import {
+  getCurrentAuthData,
+  initializeMonitor,
+  refreshStatusBarFromCache,
+  updateUsage,
+} from './services/usage-monitor'
 import { registerCommands } from './commands'
 
 let updateInterval: NodeJS.Timeout | undefined
+let configurationChangeDisposable: vscode.Disposable | undefined
 
 export function activate(context: vscode.ExtensionContext) {
   console.log('My Codex Stats is now active!')
@@ -21,8 +27,29 @@ export function activate(context: vscode.ExtensionContext) {
   // Register all commands
   registerCommands(context)
 
+  configurationChangeDisposable = vscode.workspace.onDidChangeConfiguration(
+    handleConfigurationChange,
+  )
+  context.subscriptions.push(configurationChangeDisposable)
+
   // Load auth and start monitoring
   loadAuthAndStartMonitoring()
+}
+
+function handleConfigurationChange(event: vscode.ConfigurationChangeEvent) {
+  const statusBarDisplayChanged =
+    event.affectsConfiguration('myCodexStats.balanceDisplayMode') ||
+    event.affectsConfiguration('myCodexStats.statusBarTemplate')
+
+  if (statusBarDisplayChanged) {
+    refreshStatusBarFromCache()
+  }
+
+  if (event.affectsConfiguration('myCodexStats.updateInterval')) {
+    if (getCurrentAuthData()) {
+      startPeriodicUpdates()
+    }
+  }
 }
 
 async function loadAuthAndStartMonitoring() {
@@ -33,8 +60,6 @@ async function loadAuthAndStartMonitoring() {
 
     if (authData) {
       console.log('Auth data loaded successfully')
-      console.log('Email:', authData.email)
-      console.log('Plan:', authData.planType)
 
       // Initialize the monitor with auth data
       initializeMonitor(authData)
@@ -44,18 +69,7 @@ async function loadAuthAndStartMonitoring() {
       await updateUsage()
 
       // Start periodic updates (default 5 minutes)
-      const config = vscode.workspace.getConfiguration('codexUsage')
-      const intervalSeconds = config.get<number>('updateInterval') || 300
-      console.log(`Setting update interval to ${intervalSeconds} seconds`)
-
-      if (updateInterval) {
-        clearInterval(updateInterval)
-      }
-
-      updateInterval = setInterval(async () => {
-        console.log('Periodic update triggered')
-        await updateUsage()
-      }, intervalSeconds * 1000)
+      startPeriodicUpdates()
     } else {
       console.log('No auth data found')
       showAuthRequired()
@@ -69,9 +83,27 @@ async function loadAuthAndStartMonitoring() {
   }
 }
 
+function startPeriodicUpdates() {
+  const config = vscode.workspace.getConfiguration('myCodexStats')
+  const intervalSeconds = config.get<number>('updateInterval') || 300
+  console.log(`Setting update interval to ${intervalSeconds} seconds`)
+
+  if (updateInterval) {
+    clearInterval(updateInterval)
+  }
+
+  updateInterval = setInterval(async () => {
+    console.log('Periodic update triggered')
+    await updateUsage()
+  }, intervalSeconds * 1000)
+}
+
 export function deactivate() {
   if (updateInterval) {
     clearInterval(updateInterval)
+  }
+  if (configurationChangeDisposable) {
+    configurationChangeDisposable.dispose()
   }
   const statusBarItem = getStatusBarItem()
   if (statusBarItem) {

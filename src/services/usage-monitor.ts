@@ -1,6 +1,6 @@
 import * as vscode from 'vscode'
 import { CodexAPIClient } from '../codex-client'
-import { AuthData, RateLimits } from '../types'
+import { AuthData, RateLimits, RateLimitWindow } from '../types'
 import {
   updateStatusBar,
   showUpdating,
@@ -10,6 +10,8 @@ import {
 
 let apiClient: CodexAPIClient | undefined
 let currentAuthData: AuthData | undefined
+let cachedRateLimits: RateLimits | undefined
+let cachedRateLimitsAt: number | undefined
 
 /**
  * Initialize the usage monitor with authentication data
@@ -44,15 +46,9 @@ export async function updateUsage() {
     console.log('getRateLimits returned:', rateLimits)
 
     if (rateLimits) {
-      updateStatusBar(rateLimits)
-
-      // Check if we should show notifications
-      const config = vscode.workspace.getConfiguration('codexUsage')
-      const showNotifications = config.get<boolean>('showNotifications')
-
-      if (showNotifications) {
-        checkRateLimitWarnings(rateLimits)
-      }
+      cachedRateLimits = rateLimits
+      cachedRateLimitsAt = Date.now()
+      updateStatusBar(cachedRateLimits, currentAuthData)
     } else {
       console.log('No rate limits received')
       showFetchError()
@@ -67,46 +63,70 @@ export async function updateUsage() {
 }
 
 /**
- * Check rate limits and show warnings if needed
- */
-function checkRateLimitWarnings(rateLimits: RateLimits) {
-  const warnings: string[] = []
-
-  if (rateLimits.primary && rateLimits.primary.used_percent > 90) {
-    warnings.push(
-      `5h limit is ${rateLimits.primary.used_percent.toFixed(1)}% used`,
-    )
-  }
-
-  if (rateLimits.secondary && rateLimits.secondary.used_percent > 90) {
-    warnings.push(
-      `Weekly limit is ${rateLimits.secondary.used_percent.toFixed(1)}% used`,
-    )
-  }
-
-  if (warnings.length > 0) {
-    vscode.window.showWarningMessage(
-      `Codex Stats Warning: ${warnings.join(', ')}`,
-    )
-  }
-}
-
-/**
  * Get current auth data
  */
 export function getCurrentAuthData(): AuthData | undefined {
   return currentAuthData
 }
 
+export function refreshStatusBarFromCache(): boolean {
+  if (!cachedRateLimits) {
+    return false
+  }
+
+  updateStatusBar(
+    getDisplayRateLimits(cachedRateLimits, cachedRateLimitsAt),
+    currentAuthData,
+  )
+  return true
+}
+
+function getDisplayRateLimits(
+  rateLimits: RateLimits,
+  cachedAt: number | undefined,
+): RateLimits {
+  if (cachedAt === undefined) {
+    return rateLimits
+  }
+
+  const elapsedSeconds = Math.floor((Date.now() - cachedAt) / 1000)
+
+  return {
+    primary: getDisplayRateLimitWindow(rateLimits.primary, elapsedSeconds),
+    secondary: getDisplayRateLimitWindow(rateLimits.secondary, elapsedSeconds),
+  }
+}
+
+function getDisplayRateLimitWindow(
+  rateLimit: RateLimitWindow | undefined,
+  elapsedSeconds: number,
+): RateLimitWindow | undefined {
+  if (!rateLimit) {
+    return undefined
+  }
+
+  if (rateLimit.resets_in_seconds === undefined) {
+    return { ...rateLimit }
+  }
+
+  return {
+    ...rateLimit,
+    resets_in_seconds: Math.max(
+      0,
+      rateLimit.resets_in_seconds - elapsedSeconds,
+    ),
+  }
+}
+
 function getProxyUrl(): string | undefined {
-  const config = vscode.workspace.getConfiguration('codexUsage')
+  const config = vscode.workspace.getConfiguration('myCodexStats')
   const proxyUrl = config.get<string>('proxyUrl')?.trim()
 
   return proxyUrl || undefined
 }
 
 function getModel(): string {
-  const config = vscode.workspace.getConfiguration('codexUsage')
+  const config = vscode.workspace.getConfiguration('myCodexStats')
   const model = config.get<string>('model')?.trim()
 
   return model || 'gpt-5.4-mini'

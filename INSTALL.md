@@ -58,7 +58,7 @@
    - Or use Command Palette: "Developer: Reload Window"
 
 3. **Check the status bar:**
-   - You should see a remaining quota indicator (e.g., "50% (2h 30m) / 70% (06-11)")
+   - You should see a quota percentage indicator (e.g., "50% (2h 30m) / 70% (06-11)")
    - Hover over it to see detailed information
    - Click it to manually refresh
 
@@ -67,14 +67,27 @@
 **Using a proxy:**
 
 - Open VS Code Settings and search for "My Codex Stats Proxy Url"
-- Set `codexUsage.proxyUrl` to your proxy address, for example `http://127.0.0.1:7890`
+- Set `myCodexStats.proxyUrl` to your proxy address, for example `http://127.0.0.1:7890`
 - Leave it empty to connect directly
 - Click the status bar item to force refresh after changing the setting
+
+**Changing percentage display mode:**
+
+- Open VS Code Settings and search for "My Codex Stats Balance Display Mode"
+- Set `myCodexStats.balanceDisplayMode` to `Remaining` to show remaining quota, or `Used` to show used quota
+- Click the status bar item to force refresh after changing the setting
+
+**Changing status bar template:**
+
+- Open VS Code Settings and search for "My Codex Stats Status Bar Template"
+- Set `myCodexStats.statusBarTemplate` to a template such as `{5h} · {5h.left} / {week} · {week.next}`
+- The blossom icon is always added automatically before your template, separated by one space
+- Supported placeholders: `{account}`, `{5h}`, `{week}`, `{5h.bar}`, `{week.bar}`, `{5h.next}`, `{5h.left}`, `{week.next}`, `{week.left}`
 
 **Unsupported model error:**
 
 - The default request model is `gpt-5.4-mini`
-- If your Codex account supports a different model, set `codexUsage.model` to that model slug
+- If your Codex account supports a different model, set `myCodexStats.model` to that model slug
 - Click the status bar item to force refresh after changing the setting
 
 **"Need to login" message:**

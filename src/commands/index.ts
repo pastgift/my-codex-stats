@@ -7,7 +7,7 @@ import { updateUsage } from '../services/usage-monitor'
 export function registerCommands(context: vscode.ExtensionContext) {
   // Refresh command
   const refreshCommand = vscode.commands.registerCommand(
-    'codex-usage.refresh',
+    'my-codex-stats.refresh',
     async () => {
       await updateUsage()
     },
@@ -15,7 +15,7 @@ export function registerCommands(context: vscode.ExtensionContext) {
 
   // Login command
   const loginCommand = vscode.commands.registerCommand(
-    'codex-usage.login',
+    'my-codex-stats.login',
     async () => {
       const selection = await vscode.window.showInformationMessage(
         'You need to authenticate with Codex to use this extension.',

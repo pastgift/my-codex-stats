@@ -1,4 +1,5 @@
-import axios, { AxiosProxyConfig } from 'axios'
+import axios from 'axios'
+import { HttpsProxyAgent } from 'https-proxy-agent'
 import { AuthData, RateLimits, RateLimitWindow } from './types'
 
 export class CodexAPIClient {
@@ -30,11 +31,7 @@ export class CodexAPIClient {
       console.log('Rate limits received:', this.lastRateLimits)
       return this.lastRateLimits
     } catch (error) {
-      console.error('Error getting rate limits:', error)
-      if (error instanceof Error) {
-        console.error('Error message:', error.message)
-        console.error('Error stack:', error.stack)
-      }
+      console.error('Error getting rate limits:', this.formatErrorForLog(error))
       // Return last known rate limits if available
       return this.lastRateLimits
     }
@@ -45,7 +42,6 @@ export class CodexAPIClient {
     const sessionId = this.generateSessionId()
 
     console.log('Sending request to:', url)
-    console.log('Using account ID:', this.authData.accountId)
 
     const payload = {
       model: this.model,
@@ -82,7 +78,7 @@ export class CodexAPIClient {
       session_id: sessionId,
       Accept: 'text/event-stream',
       originator: 'codex_vscode_extension',
-      'User-Agent': 'codex-usage-vscode/1.0.0',
+      'User-Agent': 'my-codex-stats-vscode/1.0.0',
       Authorization: `Bearer ${this.authData.accessToken}`,
       'Content-Type': 'application/json',
       'Cache-Control': 'no-cache',
@@ -94,28 +90,25 @@ export class CodexAPIClient {
 
     try {
       console.log('Making axios request...')
+      const proxyAgent = this.getProxyAgent()
       const response = await axios.post(url, payload, {
         headers,
         responseType: 'stream',
         validateStatus: () => true, // Accept any status to read headers
-        proxy: this.getProxyConfig(),
+        httpsAgent: proxyAgent,
+        proxy: proxyAgent ? false : undefined,
       })
 
       console.log('Response status:', response.status)
-      console.log('Response headers:', response.headers)
 
       // If not 200, try to read the error message
       if (response.status !== 200) {
         console.log('Non-200 status, attempting to read error...')
-        let errorBody = ''
 
         // Read the stream to get error details
         await new Promise((resolve, reject) => {
-          response.data.on('data', (chunk: any) => {
-            errorBody += chunk.toString()
-          })
+          response.data.on('data', () => undefined)
           response.data.on('end', () => {
-            console.log('Error response body:', errorBody)
             resolve(undefined)
           })
           response.data.on('error', reject)
@@ -135,13 +128,12 @@ export class CodexAPIClient {
         response.data.destroy()
       }
     } catch (error) {
-      console.error('Axios error caught:', error)
+      console.error('Axios request failed:', this.formatErrorForLog(error))
       // Even if the request fails, we might have gotten headers
       if (axios.isAxiosError(error)) {
         console.log('Is axios error, checking response...')
         if (error.response) {
           console.log('Error response status:', error.response.status)
-          console.log('Error response headers:', error.response.headers)
           this.lastRateLimits = this.extractRateLimitsFromHeaders(
             error.response.headers,
           )
@@ -236,41 +228,45 @@ export class CodexAPIClient {
     ).join('')
   }
 
-  private getProxyConfig(): AxiosProxyConfig | false | undefined {
+  private getProxyAgent(): HttpsProxyAgent<string> | undefined {
     if (!this.proxyUrl) {
       return undefined
     }
 
     try {
       const proxy = new URL(this.proxyUrl)
-      const protocol = proxy.protocol.replace(':', '')
 
-      if (protocol !== 'http' && protocol !== 'https') {
+      if (proxy.protocol !== 'http:' && proxy.protocol !== 'https:') {
         console.warn(`Unsupported proxy protocol: ${proxy.protocol}`)
         return undefined
       }
 
-      const proxyConfig: AxiosProxyConfig = {
-        protocol,
-        host: proxy.hostname,
-        port: proxy.port
-          ? parseInt(proxy.port, 10)
-          : protocol === 'https'
-            ? 443
-            : 80,
-      }
-
-      if (proxy.username || proxy.password) {
-        proxyConfig.auth = {
-          username: decodeURIComponent(proxy.username),
-          password: decodeURIComponent(proxy.password),
-        }
-      }
-
-      return proxyConfig
+      return new HttpsProxyAgent(proxy)
     } catch (error) {
-      console.warn('Invalid proxy URL configured:', this.proxyUrl, error)
+      console.warn('Invalid proxy URL configured:', this.formatErrorForLog(error))
       return undefined
     }
+  }
+
+  private formatErrorForLog(error: unknown): string {
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status
+      const code = error.code
+      const message = error.message || 'Axios request failed'
+
+      return [
+        message,
+        code ? `code=${code}` : undefined,
+        status ? `status=${status}` : undefined,
+      ]
+        .filter(Boolean)
+        .join(' ')
+    }
+
+    if (error instanceof Error) {
+      return error.message
+    }
+
+    return String(error)
   }
 }
