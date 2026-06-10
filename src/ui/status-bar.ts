@@ -5,7 +5,7 @@ import { formatStatusBarResetDate } from '../utils/time-formatter'
 let statusBarItem: vscode.StatusBarItem
 const UPDATING_SUFFIX = ' ...'
 const DEFAULT_STATUS_BAR_TEMPLATE = '{5h} · {5h.left} / {week} · {week.next}'
-const BALANCE_BAR_LENGTH = 10
+const BALANCE_BAR_LENGTH = 5
 const BALANCE_BAR_FILLED = '█'
 const BALANCE_BAR_EMPTY = '░'
 type BalanceDisplayMode = 'Used' | 'Remaining'
